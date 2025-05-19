@@ -6,6 +6,7 @@ from authlib.integrations.starlette_client import OAuth
 from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import HTTPException
 from fastapi.security.oauth2 import OAuth2PasswordBearer
+from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from starlette.config import Config
@@ -18,6 +19,11 @@ class Settings(BaseSettings):
     secret_key: str
     discord_client_id: str
     discord_client_secret: str
+
+
+class DiscordUser(BaseModel):
+    username: str
+    display_name: str
 
 
 settings = Settings()
@@ -52,13 +58,26 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
     )
     if not response.is_success:
         raise credentials_exception
-    return response.json()["username"]
+    json = response.json()
+    return DiscordUser(username=json["username"], display_name=json["global_name"])
 
 
-class Tournaments(SQLModel, table=True):
+DiscordAuth = Annotated[DiscordUser, Depends(get_current_user)]
+
+
+class TournamentBase(SQLModel):
+    name: str = Field(max_length=255)
+    description: str | None = Field(default=None)
+
+
+class TournamentWithId(SQLModel):
     id: str = Field(primary_key=True, max_length=15)
     name: str = Field(max_length=255)
     description: str | None = Field(default=None)
+
+
+class Tournaments(TournamentWithId, table=True):
+    created_by: str = Field(default=None)
 
 
 def create_db_and_tables():
@@ -88,8 +107,8 @@ async def auth(request: Request):
 
 
 @app.get("/users/me")
-async def my_user(username: Annotated[str, Depends(get_current_user)]):
-    return {"message": f"Hello {username}"}
+async def my_user(user: DiscordAuth):
+    return user
 
 
 @app.get("/tournaments")
@@ -107,8 +126,11 @@ async def get_tournament(tournament_id: str, session: SessionDep):
 
 
 @app.post("/tournaments")
-async def create_tournament(tournament: Tournaments, session: SessionDep):
-    session.add(tournament)
+async def create_tournament(
+    tournament: TournamentWithId, user: DiscordAuth, session: SessionDep
+):
+    new_tournament = Tournaments(**tournament.model_dump(), created_by=user.username)
+    session.add(new_tournament)
     session.commit()
-    session.refresh(tournament)
-    return tournament
+    session.refresh(new_tournament)
+    return new_tournament
