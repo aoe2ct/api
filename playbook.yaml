@@ -35,3 +35,26 @@
     ansible.builtin.systemd:
       name: caddy
       state: reloaded
+  - name: Create systemd unit for FastAPI
+    ansible.builtin.copy:
+      content: |
+          [Unit]
+          Description=FastAPI uvicorn
+          After=network.target
+
+          [Service]
+          User=web
+          WorkingDirectory=/home/web
+          LimitNOFILE=4096
+          ExecStart=/usr/bin/uv run fastapi run gunicorn main:app --workers 2 -k uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000 --error-logfile /home/web/error_log.txt
+          Restart=on-failure
+          RestartSec=5s
+
+          [Install]
+          WantedBy=multi-user.target
+      dest: /etc/systemd/system/uvicorn.service
+  - name: Enable and start uvicorn
+    ansible.builtin.systemd:
+      name: uvicorn
+      enabled: true
+      state: started
