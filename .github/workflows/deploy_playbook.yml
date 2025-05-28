@@ -21,14 +21,14 @@ jobs:
         run: |
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > private_key.pem
           chmod 600 private_key.pem
+      - name: Setup Ansible Vault creds
+        run: |
+          echo "${{ secrets.SECRETS_PASSWORD }}" > vault_pass.txt
       - name: Install Ansible
         shell: bash
         run: |
           sudo apt update
           sudo apt install -y ansible
-      - name: Setup Ansible Vault creds
-        run: |
-          echo ‘${{ secrets.SECRETS_PASSWORD }}‘ > vault_pass.txt
       - name: Run Ansible Playbook
         env:
           ANSIBLE_USER: ${{ secrets.ANSIBLE_USER }}
