@@ -1,123 +1,124 @@
-
 - name: Install necessary dependencies
   hosts: webservers
-  vars: 
+  vars:
     dns_and_reverse_proxies:
-    - { domain: "34b446db-d550-4c6a-9e12-22f1f18bfd7e.pub.instances.scw.cloud", present: true, caddy_served: true, port: 8000, ssl: true }
+      - { domain: "34b446db-d550-4c6a-9e12-22f1f18bfd7e.pub.instances.scw.cloud", present: true, caddy_served: true, port: 8000, ssl: true }
 
   tasks:
-  - name: Ensure Caddy is at the latest version
-    ansible.builtin.dnf:
-      name: caddy
-      state: latest
-  - name: Ensure uv is at the latest version
-    ansible.builtin.dnf:
-      name: uv
-      state: latest
-  - name: Ensure unzip is at the latest version
-    ansible.builtin.dnf:
-      name: unzip
-      state: latest
-  - name: Enable and start Caddy
-    ansible.builtin.systemd:
-      name: caddy
-      enabled: true
-      state: started
-  - name: Configure Caddy
-    block:
-    - name: Add proxy to Caddyfile
+    - name: Ensure Caddy is at the latest version # noqa: package-latest
+      ansible.builtin.dnf:
+        name: caddy
+        state: latest
+    - name: Ensure uv is at the latest version # noqa: package-latest
+      ansible.builtin.dnf:
+        name: uv
+        state: latest
+    - name: Ensure unzip is at the latest version # noqa: package-latest
+      ansible.builtin.dnf:
+        name: unzip
+        state: latest
+    - name: Enable and start Caddy
+      ansible.builtin.systemd:
+        name: caddy
+        enabled: true
+        state: started
+    - name: Configure Caddy
+      when: item.present
+      block:
+        - name: Add proxy to Caddyfile
+          ansible.builtin.copy:
+            content: |
+              {% if not item.ssl %}http://{% endif %}{{ item.domain }} {
+                reverse_proxy :{{ item.port }}
+              }
+            dest: /etc/caddy/Caddyfile.d/{{ item.domain }}.caddyfile
+            mode: "0644"
+          when: item.caddy_served
+          loop: "{{ dns_and_reverse_proxies }}"
+    - name: Reload Caddy
+      ansible.builtin.systemd:
+        name: caddy
+        state: reloaded
+    - name: Create Group
+      ansible.builtin.group:
+        name: web
+
+    - name: Create User
+      ansible.builtin.user:
+        name: web
+        state: present
+        group: web
+        shell: /bin/bash
+
+    - name: Create web root directory
+      ansible.builtin.file:
+        path: /var/www/app
+        state: directory
+        owner: web
+        group: web
+        mode: '0755'
+
+    - name: Create log directory
+      ansible.builtin.file:
+        path: /var/log/uvicorn
+        state: directory
+        owner: web
+        group: web
+        mode: '0755'
+
+    - name: Create systemd unit for FastAPI
       ansible.builtin.copy:
         content: |
-          {% if not item.ssl %}http://{% endif %}{{ item.domain }} {
-            reverse_proxy :{{ item.port }}
-          }          
-        dest: /etc/caddy/Caddyfile.d/{{item.domain}}.caddyfile
-      when: item.caddy_served
-      loop: "{{ dns_and_reverse_proxies }}"
-    when: item.present
-  - name: Reload Caddy
-    ansible.builtin.systemd:
-      name: caddy
-      state: reloaded
-  - name: Create Group
-    group:
-      name: web
+            [Unit]
+            Description=FastAPI uvicorn
+            After=network.target
 
-  - name: Create User
-    user:
-      name: web
-      state: present
-      group: web
-      shell: /bin/bash
+            [Service]
+            User=web
+            WorkingDirectory=/var/www/app/api-main
+            LimitNOFILE=4096
+            ExecStart=/usr/bin/uv run gunicorn app.main:app --workers 2 -k uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000 --error-logfile /var/log/uvicorn/error_log.txt
+            Restart=on-failure
+            RestartSec=5s
 
-  - name: Create web root directory
-    file:
-      path: /var/www/app
-      state: directory
-      owner: web
-      group: web
-      mode: '0755'
-
-  - name: Create log directory
-    file:
-      path: /var/log/uvicorn
-      state: directory
-      owner: web
-      group: web
-      mode: '0755'
-
-  - name: Create systemd unit for FastAPI
-    ansible.builtin.copy:
-      content: |
-          [Unit]
-          Description=FastAPI uvicorn
-          After=network.target
-
-          [Service]
-          User=web
-          WorkingDirectory=/var/www/app/api-main
-          LimitNOFILE=4096
-          ExecStart=/usr/bin/uv run gunicorn app.main:app --workers 2 -k uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000 --error-logfile /var/log/uvicorn/error_log.txt
-          Restart=on-failure
-          RestartSec=5s
-
-          [Install]
-          WantedBy=multi-user.target
-      dest: /etc/systemd/system/uvicorn.service
-  - name: Enable and start uvicorn
-    ansible.builtin.systemd_service:
-      name: uvicorn
-      enabled: true
-      state: started
-  - name: Reload systemd
-    ansible.builtin.systemd_service:
-      daemon_reload: true
-  - name: Download and decompress the latest aoe2ct API code
-    ansible.builtin.unarchive:
-      src: https://github.com/aoe2ct/api/archive/refs/heads/main.zip
-      dest: /var/www/app
-      remote_src: yes
-      owner: web
-      group: web
-      mode: '0755'
-  - name: Install dependencies
-    ansible.builtin.command: /usr/bin/uv sync --locked
-    become: yes
-    become_user: web
-    args:
-      chdir: /var/www/app/api-main
-  - name: Create env file
-    ansible.builtin.copy:
-      content: |
-        SECRET_KEY={{ secret_key }}
-        DATABASE_URL={{ database_url }}
-        DISCORD_CLIENT_ID={{ discord_client_id }}
-        DISCORD_CLIENT_SECRET={{ discord_client_secret }}
-      dest: /var/www/app/api-main/.env
-      owner: web
-      group: web
-      mode: '0700'
-  - name: Restart uvicorn
-    ansible.builtin.systemd_service:
-      state: restarted
-      name: uvicorn
+            [Install]
+            WantedBy=multi-user.target
+        dest: /etc/systemd/system/uvicorn.service
+        mode: "0644"
+    - name: Enable and start uvicorn
+      ansible.builtin.systemd_service:
+        name: uvicorn
+        enabled: true
+        state: started
+    - name: Reload systemd
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+    - name: Download and decompress the latest aoe2ct API code
+      ansible.builtin.unarchive:
+        src: https://github.com/aoe2ct/api/archive/refs/heads/main.zip
+        dest: /var/www/app
+        remote_src: true
+        owner: web
+        group: web
+        mode: '0755'
+    - name: Install dependencies # noqa: no-changed-when
+      ansible.builtin.command: /usr/bin/uv sync --locked
+      become: true
+      become_user: web
+      args:
+        chdir: /var/www/app/api-main
+    - name: Create env file
+      ansible.builtin.copy:
+        content: |
+          SECRET_KEY={{ secret_key }}
+          DATABASE_URL={{ database_url }}
+          DISCORD_CLIENT_ID={{ discord_client_id }}
+          DISCORD_CLIENT_SECRET={{ discord_client_secret }}
+        dest: /var/www/app/api-main/.env
+        owner: web
+        group: web
+        mode: '0700'
+    - name: Restart uvicorn
+      ansible.builtin.systemd_service:
+        state: restarted
+        name: uvicorn
