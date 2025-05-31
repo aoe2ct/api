@@ -7,18 +7,18 @@ from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import HTTPException
 from fastapi.security.oauth2 import OAuth2PasswordBearer
 from pydantic import BaseModel
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlmodel import Field, Session, SQLModel, create_engine, select
+from sqlmodel import Session, select
 from starlette.config import Config
 from starlette.middleware.sessions import SessionMiddleware
 
-
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
-    database_url: str
-    secret_key: str
-    discord_client_id: str
-    discord_client_secret: str
+from .db import (
+    TournamentCreate,
+    Tournaments,
+    create_db_and_tables,
+    fix_stage,
+    get_session,
+)
+from .settings import settings
 
 
 class DiscordUser(BaseModel):
@@ -26,8 +26,6 @@ class DiscordUser(BaseModel):
     display_name: str
 
 
-settings = Settings()
-engine = create_engine(settings.database_url)
 config = Config(".env")
 oauth = OAuth(config)
 _ = oauth.register(
@@ -36,11 +34,6 @@ _ = oauth.register(
     client_kwargs={"scope": "identify"},
 )
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
-
-
-def get_session():
-    with Session(engine) as session:
-        yield session
 
 
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -63,25 +56,6 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
 
 
 DiscordAuth = Annotated[DiscordUser, Depends(get_current_user)]
-
-
-class TournamentBase(SQLModel):
-    name: str = Field(max_length=255)
-    description: str | None = Field(default=None)
-
-
-class TournamentWithId(SQLModel):
-    id: str = Field(primary_key=True, max_length=15)
-    name: str = Field(max_length=255)
-    description: str | None = Field(default=None)
-
-
-class Tournaments(TournamentWithId, table=True):
-    created_by: str = Field(default=None)
-
-
-def create_db_and_tables():
-    SQLModel.metadata.create_all(engine)
 
 
 @asynccontextmanager
@@ -127,9 +101,10 @@ async def get_tournament(tournament_id: str, session: SessionDep):
 
 @app.post("/tournaments")
 async def create_tournament(
-    tournament: TournamentWithId, user: DiscordAuth, session: SessionDep
+    tournament: TournamentCreate, user: DiscordAuth, session: SessionDep
 ):
-    new_tournament = Tournaments(**tournament.model_dump(), created_by=user.username)
+    new_tournament = fix_stage(Tournaments.model_validate(tournament))
+    new_tournament.created_by = user.username
     session.add(new_tournament)
     session.commit()
     session.refresh(new_tournament)
