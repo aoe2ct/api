@@ -32,8 +32,11 @@ class Tournaments(TournamentWithId, table=True):
     stages: list["Stage"] = Relationship()
 
 
+class PublicTournament(TournamentWithId):
+    stages: list["PublicStage"] = []
+
+
 class BaseStage(SQLModel):
-    order: int = Field(primary_key=True, gt=0)
     format: str = "knockout"
     start_date: date | None = None
     end_date: date | None = None
@@ -43,10 +46,18 @@ class BaseStage(SQLModel):
     civ_draft: str | None
 
 
-class Stage(BaseStage, table=True):
+class CreateStage(BaseStage):
+    order: int = Field(primary_key=True, gt=0)
+
+
+class Stage(CreateStage, table=True):
     tournament_id: str = Field(
         max_length=15, foreign_key="tournaments.id", primary_key=True
     )
+
+
+class PublicStage(BaseStage):
+    pass
 
 
 def create_db_and_tables():

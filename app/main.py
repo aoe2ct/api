@@ -12,6 +12,7 @@ from starlette.config import Config
 from starlette.middleware.sessions import SessionMiddleware
 
 from .db import (
+    PublicTournament,
     TournamentCreate,
     Tournaments,
     create_db_and_tables,
@@ -91,7 +92,7 @@ async def list_tournaments(session: SessionDep):
     return tournaments
 
 
-@app.get("/tournaments/{tournament_id}")
+@app.get("/tournaments/{tournament_id}", response_model=PublicTournament)
 async def get_tournament(tournament_id: str, session: SessionDep):
     tournament = session.get(Tournaments, tournament_id)
     if not tournament:
