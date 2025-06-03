@@ -31,6 +31,7 @@
             content: |
               {% if not item.ssl %}http://{% endif %}{{ item.domain }} {
                 reverse_proxy :{{ item.port }}
+                encode
               }
             dest: /etc/caddy/Caddyfile.d/{{ item.domain }}.caddyfile
             mode: "0644"
