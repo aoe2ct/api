@@ -5,6 +5,7 @@ import httpx
 from authlib.integrations.starlette_client import OAuth
 from fastapi import Depends, FastAPI, Request, status
 from fastapi.exceptions import HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.oauth2 import OAuth2PasswordBearer
 from pydantic import BaseModel
 from sqlmodel import Session, select
@@ -68,6 +69,14 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(SessionMiddleware, settings.secret_key)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "https://replaypacker.zeta-two.com/"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    max_age=3600 * 12,  # 12 hours
+)
 
 
 @app.get("/login")
