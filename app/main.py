@@ -85,7 +85,7 @@ app.add_middleware(
 
 @app.get("/login")
 async def login(request: Request):
-    redirect_uri = request.url_for("auth")
+    redirect_uri = f"{settings.frontend_base_url}/auth"
     return await oauth.discord.authorize_redirect(request, redirect_uri)
 
 

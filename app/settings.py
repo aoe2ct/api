@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     secret_key: str
     discord_client_id: str
     discord_client_secret: str
+    frontend_base_url: str
 
 
 settings = Settings()
