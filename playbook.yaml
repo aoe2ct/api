@@ -116,6 +116,7 @@
           DATABASE_URL={{ database_url }}
           DISCORD_CLIENT_ID={{ discord_client_id }}
           DISCORD_CLIENT_SECRET={{ discord_client_secret }}
+          FRONTEND_BASE_URL={{ frontend_base_url }}
         dest: /var/www/app/api-main/.env
         owner: web
         group: web
