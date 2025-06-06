@@ -75,6 +75,8 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:5173",
         "https://replaypacker.zeta-two.com/",
+        "https://aoe2tools.net/",
+        "https://www.aoe2tools.net/",
     ],
     allow_credentials=True,
     allow_methods=["*"],
