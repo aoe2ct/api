@@ -13,6 +13,7 @@ from starlette.config import Config
 from starlette.middleware.sessions import SessionMiddleware
 
 from .db import (
+    Players,
     PublicTournament,
     TournamentCreate,
     Tournaments,
@@ -24,6 +25,7 @@ from .settings import settings
 
 
 class DiscordUser(BaseModel):
+    id: str
     username: str
     display_name: str
 
@@ -54,7 +56,9 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
     if not response.is_success:
         raise credentials_exception
     json = response.json()
-    return DiscordUser(username=json["username"], display_name=json["global_name"])
+    return DiscordUser(
+        id=json["id"], username=json["username"], display_name=json["global_name"]
+    )
 
 
 DiscordAuth = Annotated[DiscordUser, Depends(get_current_user)]
@@ -125,3 +129,9 @@ async def create_tournament(
     session.commit()
     session.refresh(new_tournament)
     return new_tournament
+
+
+@app.get("/players")
+async def list_players(session: SessionDep):
+    players = session.exec(select(Players)).all()
+    return players

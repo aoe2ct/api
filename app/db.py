@@ -1,6 +1,5 @@
 import enum
 from datetime import date
-from typing import Literal
 
 from sqlmodel import Field, Relationship, Session, SQLModel, create_engine
 
@@ -57,6 +56,17 @@ class Stage(CreateStage, table=True):
 
 
 class PublicStage(BaseStage):
+    pass
+
+
+class PlayerBase(SQLModel):
+    relic_id: str = Field(primary_key=True)
+    discord: str
+    name: str
+    timezone: str
+
+
+class Players(PlayerBase, table=True):
     pass
 
 
