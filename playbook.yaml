@@ -2,20 +2,16 @@
   hosts: webservers
   vars:
     dns_and_reverse_proxies:
-      - {
-          domain: "34b446db-d550-4c6a-9e12-22f1f18bfd7e.pub.instances.scw.cloud",
-          present: true,
-          caddy_served: true,
-          port: 8000,
-          ssl: true,
-        }
-      - {
-          domain: "api.aoe2tools.net",
-          present: true,
-          caddy_served: true,
-          port: 8000,
-          ssl: true,
-        }
+      - domain: "34b446db-d550-4c6a-9e12-22f1f18bfd7e.pub.instances.scw.cloud"
+        present: true
+        caddy_served: true
+        port: 8000
+        ssl: true
+      - domain: "api.aoe2tools.net"
+        present: true
+        caddy_served: true
+        port: 8000
+        ssl: true
 
   tasks:
     - name: Ensure Caddy is at the latest version # noqa: package-latest
