@@ -8,6 +8,9 @@ from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.oauth2 import OAuth2PasswordBearer
 from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from sqlmodel import Session, select
 from starlette.config import Config
 from starlette.middleware.sessions import SessionMiddleware
@@ -21,7 +24,10 @@ from .db import (
     fix_stage,
     get_session,
 )
+from .kick import get_kick_view_count
 from .settings import settings
+from .twitch import get_twitch_view_count
+from .youtube import get_youtube_view_count
 
 
 class DiscordUser(BaseModel):
@@ -63,6 +69,8 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
 
 DiscordAuth = Annotated[DiscordUser, Depends(get_current_user)]
 
+limiter = Limiter(key_func=get_remote_address)
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -71,6 +79,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.state.limiter = limiter
 
 app.add_middleware(SessionMiddleware, settings.secret_key)
 app.add_middleware(
@@ -89,6 +98,11 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(RateLimitExceeded)
+def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return _rate_limit_exceeded_handler(request, exc)
+
+
 @app.get("/login")
 async def login(request: Request):
     redirect_uri = f"{settings.frontend_base_url}/auth"
@@ -100,9 +114,28 @@ async def auth(request: Request):
     return await oauth.discord.authorize_access_token(request)
 
 
+@app.get("/auth/twitch")
+async def auth_twitch():
+    return None
+
+
 @app.get("/users/me")
 async def my_user(user: DiscordAuth):
     return user
+
+
+@app.get("/stream/viewers")
+@limiter.limit("800/minute")
+async def stream_viewers(
+    request: Request,
+    twitch: str | None = None,
+    kick: str | None = None,
+    youtube: str | None = None,
+):
+    twitch_views = await get_twitch_view_count(twitch) if twitch is not None else 0
+    kick_views = await get_kick_view_count(kick) if kick is not None else 0
+    youtube_views = await get_youtube_view_count(youtube) if youtube is not None else 0
+    return {"total": twitch_views + kick_views + youtube_views}
 
 
 @app.get("/tournaments")

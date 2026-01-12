@@ -2,8 +2,20 @@
   hosts: webservers
   vars:
     dns_and_reverse_proxies:
-      - { domain: "34b446db-d550-4c6a-9e12-22f1f18bfd7e.pub.instances.scw.cloud", present: true, caddy_served: true, port: 8000, ssl: true }
-      - { domain: "api.aoe2tools.net", present: true, caddy_served: true, port: 8000, ssl: true }
+      - {
+          domain: "34b446db-d550-4c6a-9e12-22f1f18bfd7e.pub.instances.scw.cloud",
+          present: true,
+          caddy_served: true,
+          port: 8000,
+          ssl: true,
+        }
+      - {
+          domain: "api.aoe2tools.net",
+          present: true,
+          caddy_served: true,
+          port: 8000,
+          ssl: true,
+        }
 
   tasks:
     - name: Ensure Caddy is at the latest version # noqa: package-latest
@@ -58,7 +70,7 @@
         state: directory
         owner: web
         group: web
-        mode: '0755'
+        mode: "0755"
 
     - name: Create log directory
       ansible.builtin.file:
@@ -66,25 +78,25 @@
         state: directory
         owner: web
         group: web
-        mode: '0755'
+        mode: "0755"
 
     - name: Create systemd unit for FastAPI
       ansible.builtin.copy:
         content: |
-            [Unit]
-            Description=FastAPI uvicorn
-            After=network.target
+          [Unit]
+          Description=FastAPI uvicorn
+          After=network.target
 
-            [Service]
-            User=web
-            WorkingDirectory=/var/www/app/api-main
-            LimitNOFILE=4096
-            ExecStart=/usr/bin/uv run gunicorn app.main:app --workers 2 -k uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000 --error-logfile /var/log/uvicorn/error_log.txt
-            Restart=on-failure
-            RestartSec=5s
+          [Service]
+          User=web
+          WorkingDirectory=/var/www/app/api-main
+          LimitNOFILE=4096
+          ExecStart=/usr/bin/uv run gunicorn app.main:app --workers 2 -k uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000 --error-logfile /var/log/uvicorn/error_log.txt
+          Restart=on-failure
+          RestartSec=5s
 
-            [Install]
-            WantedBy=multi-user.target
+          [Install]
+          WantedBy=multi-user.target
         dest: /etc/systemd/system/uvicorn.service
         mode: "0644"
     - name: Enable and start uvicorn
@@ -102,7 +114,7 @@
         remote_src: true
         owner: web
         group: web
-        mode: '0755'
+        mode: "0755"
     - name: Install dependencies # noqa: no-changed-when
       ansible.builtin.command: /usr/bin/uv sync --locked
       become: true
@@ -117,10 +129,16 @@
           DISCORD_CLIENT_ID={{ discord_client_id }}
           DISCORD_CLIENT_SECRET={{ discord_client_secret }}
           FRONTEND_BASE_URL={{ frontend_base_url }}
+          TWITCH_CLIENT_ID={{ twitch_client_id }}
+          TWITCH_CLIENT_SECRET={{ twitch_client_secret }}
+          KICK_CLIENT_ID={{ kick_client_id }}
+          KICK_CLIENT_SECRET={{ kick_client_secret }}
+          YOUTUBE_CLIENT_ID={{ youtube_client_id }}
+          YOUTUBE_CLIENT_SECRET={{ youtube_client_secret }}
         dest: /var/www/app/api-main/.env
         owner: web
         group: web
-        mode: '0700'
+        mode: "0700"
     - name: Restart uvicorn
       ansible.builtin.systemd_service:
         state: restarted

@@ -8,6 +8,12 @@ class Settings(BaseSettings):
     discord_client_id: str
     discord_client_secret: str
     frontend_base_url: str
+    twitch_client_id: str
+    twitch_client_secret: str
+    kick_client_id: str
+    kick_client_secret: str
+    youtube_client_id: str
+    youtube_client_secret: str
 
 
 settings = Settings()
