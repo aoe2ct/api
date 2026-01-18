@@ -12,8 +12,7 @@ class Settings(BaseSettings):
     twitch_client_secret: str
     kick_client_id: str
     kick_client_secret: str
-    youtube_client_id: str
-    youtube_client_secret: str
+    youtube_api_key: str
 
 
 settings = Settings()
