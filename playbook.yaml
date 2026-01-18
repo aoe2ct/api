@@ -129,8 +129,7 @@
           TWITCH_CLIENT_SECRET={{ twitch_client_secret }}
           KICK_CLIENT_ID={{ kick_client_id }}
           KICK_CLIENT_SECRET={{ kick_client_secret }}
-          YOUTUBE_CLIENT_ID={{ youtube_client_id }}
-          YOUTUBE_CLIENT_SECRET={{ youtube_client_secret }}
+          YOUTUBE_API_KEY={{ youtube_api_key }}
         dest: /var/www/app/api-main/.env
         owner: web
         group: web
