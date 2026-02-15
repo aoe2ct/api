@@ -27,7 +27,7 @@ from .db import (
 from .kick import get_kick_view_count
 from .settings import settings
 from .twitch import get_twitch_view_count
-from .youtube import get_youtube_view_count
+from .youtube import get_youtube_view_count, get_youtube_playlist_view_count
 
 
 class DiscordUser(BaseModel):
@@ -131,11 +131,17 @@ async def stream_viewers(
     twitch: str | None = None,
     kick: str | None = None,
     youtube: str | None = None,
+    yt_playlist: str | None = None,
 ):
     twitch_views = await get_twitch_view_count(twitch) if twitch is not None else 0
     kick_views = await get_kick_view_count(kick) if kick is not None else 0
     youtube_views = await get_youtube_view_count(youtube) if youtube is not None else 0
-    return {"total": twitch_views + kick_views + youtube_views}
+    playlist_views = (
+        await get_youtube_playlist_view_count(yt_playlist)
+        if yt_playlist is not None
+        else 0
+    )
+    return {"total": twitch_views + kick_views + youtube_views + playlist_views}
 
 
 @app.get("/tournaments")

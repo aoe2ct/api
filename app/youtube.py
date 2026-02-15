@@ -32,14 +32,32 @@ async def get_video_id(channel: str):
     return None
 
 
-async def get_viewer_count(video_id: str):
+async def get_video_ids(playlist: str) -> list[str]:
     response = await youtube_api(
-        "get", f"videos?part=liveStreamingDetails&id={video_id}"
+        "get", f"playlistItems?playlistId={playlist}&part=snippet"
+    )
+    json_r = response.json()
+    return [
+        item["snippet"]["resourceId"]["videoId"] for item in json_r.get("items", [])
+    ]
+
+
+async def get_viewer_count(video_id: str | list[str]):
+    if isinstance(video_id, str):
+        video_id = [video_id]
+    video_id_part = "&".join([f"id={video}" for video in video_id])
+    print(video_id_part)
+    response = await youtube_api(
+        "get", f"videos?part=liveStreamingDetails&{video_id_part}"
     )
     j_resp = response.json()
-    if "items" in j_resp:
-        return int(j_resp["items"][0]["liveStreamingDetails"]["concurrentViewers"])
-    return 0
+    print(j_resp)
+    return sum(
+        [
+            int(item.get("liveStreamingDetails", {}).get("concurrentViewers", 0))
+            for item in j_resp.get("items", [])
+        ]
+    )
 
 
 async def youtube_api(
@@ -61,3 +79,9 @@ async def get_youtube_view_count(channel: str):
         return 0
     viewers = await get_viewer_count(video_id)
     return viewers
+
+
+async def get_youtube_playlist_view_count(playlist: str):
+    video_ids = await get_video_ids(playlist)
+    view_count = await get_viewer_count(video_ids)
+    return view_count
